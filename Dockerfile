@@ -2,19 +2,11 @@
 
 # Cython builder stage
 FROM python:3.12 AS cython-builder
-
 WORKDIR /build
-
-# Copy and install requirements first (better caching)
 COPY requirements.txt WebHostLib/requirements.txt
-
-RUN pip install --no-cache-dir -r \
-    WebHostLib/requirements.txt \
-    "setuptools>=75,<81"
-
+RUN pip install --no-cache-dir -r WebHostLib/requirements.txt "setuptools>=75,<81"
 COPY _speedups.pyx .
 COPY intset.h .
-
 RUN cythonize -b -i _speedups.pyx
 
 # MultiworldGG
@@ -22,7 +14,9 @@ FROM python:3.12-slim-bookworm AS multiworldgg
 ARG TARGETARCH
 ENV VIRTUAL_ENV=/opt/venv
 ENV PYTHONUNBUFFERED=1
-WORKDIR /app
+
+# CHANGED: Build into a source template folder instead
+WORKDIR /app_source
 
 # Install requirements
 # hadolint ignore=DL3008
@@ -43,25 +37,23 @@ RUN python -m venv $VIRTUAL_ENV; \
 
 # Copy and install requirements first (better caching)
 COPY WebHostLib/requirements.txt WebHostLib/requirements.txt
-
-RUN pip install --no-cache-dir -r \
-    WebHostLib/requirements.txt \
-    gunicorn==23.0.0
+RUN pip install --no-cache-dir -r WebHostLib/requirements.txt gunicorn==23.0.0
 
 COPY . .
-
 COPY --from=cython-builder /build/*.so ./
 
 # Run ModuleUpdate
 RUN python ModuleUpdate.py -y
 
 # Purge unneeded packages
-RUN apt-get purge -y \
-    git \
-    gcc \
-    libc6-dev \
-    g++ && \
-    apt-get autoremove -y
+RUN apt-get purge -y git gcc libc6-dev g++ && apt-get autoremove -y
+
+# NEW: Set up the entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# CHANGED: Set the final runtime directory back to /app
+WORKDIR /app
 
 # Define health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
@@ -70,4 +62,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Ensure no runtime ModuleUpdate.
 ENV SKIP_REQUIREMENTS_UPDATE=true
 
-ENTRYPOINT [ "entrypoint.sh" ]
+# NEW: Use the entrypoint script to handle the copy logic
+ENTRYPOINT [ "/usr/local/bin/entrypoint.sh" ]
+CMD [ "python", "WebHost.py" ]
