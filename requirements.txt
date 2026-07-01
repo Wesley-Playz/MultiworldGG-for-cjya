@@ -27,3 +27,4 @@ Pymem==1.14.0
 
 
 python-dotenv
+Authlib==0.5.1
