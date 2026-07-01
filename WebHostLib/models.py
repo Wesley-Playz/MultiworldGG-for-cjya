@@ -11,6 +11,19 @@ STATE_STARTED = 1
 STATE_ERROR = -1
 
 
+class DiscordIdentity(db.Entity):
+    """
+    Links a Flask session (session["_id"]) to a verified Discord account.
+    Populated on successful OAuth callback. Used both to gate YAML uploads
+    in lobbies and to look up which Slot password(s) to reveal on a room page.
+    """
+    session_id = PrimaryKey(UUID)
+    discord_id = Required(str, index=True)
+    discord_username = Required(str)
+    discord_avatar = Optional(str, nullable=True)
+    linked_at = Required(datetime, default=lambda: utcnow())
+
+
 class Slot(db.Entity):
     id = PrimaryKey(int, auto=True)
     player_id = Required(int)
@@ -18,6 +31,12 @@ class Slot(db.Entity):
     data = Optional(bytes, lazy=True)
     seed = Optional('Seed', index=True)
     game = Required(str, index=True)
+    # Per-slot connect password. Assigned at YAML-upload time (see LobbyYaml.slot_password)
+    # and carried through generation into the multidata; copied here on multidata upload
+    # purely so the room page can display it without re-reading the multidata blob.
+    slot_password = Optional(str, default="")
+    # Discord snowflake (as string) of whoever uploaded the YAML for this slot, if known.
+    discord_owner_id = Optional(str, index=True, nullable=True)
 
 
 class Room(db.Entity):
@@ -103,6 +122,11 @@ class LobbyPlayer(db.Entity):
     id = PrimaryKey(int, auto=True)
     lobby = Required(Lobby, index=True)
     session_id = Required(UUID, index=True)
+    # Discord snowflake (as string) of the authenticated user, required to upload a YAML.
+    # Null = joined the lobby but has not linked Discord yet (can view/chat, cannot upload).
+    discord_id = Optional(str, index=True, nullable=True)
+    discord_username = Optional(str, nullable=True)
+    discord_avatar = Optional(str, nullable=True)
     player_name = Required(str)
     joined_at = Required(datetime, default=lambda: utcnow())
     is_ready = Required(bool, default=False)
@@ -124,6 +148,15 @@ class LobbyYaml(db.Entity):
     uploaded_at = Required(datetime, default=lambda: utcnow())
     apworld = Optional('LobbyApworld')
     apworld_requests = Set('LobbyApworldRequest')
+    # Random 4-6 char connect password, assigned the moment this YAML is
+    # uploaded (requires a linked Discord account — see
+    # api/lobby.py:lobby_upload_yaml). This exact value is also injected into
+    # `content` itself as a top-level `mwgg_slot_password` field, so it
+    # survives Download Package -> local generation -> roll_settings ->
+    # Main.py's write_multidata() unchanged. This DB column exists so the
+    # lobby can show/reference the password without re-parsing YAML, and so
+    # it stays the single source of truth if a YAML is ever re-downloaded.
+    slot_password = Required(str, default="")
 
 
 class LobbyApworld(db.Entity):

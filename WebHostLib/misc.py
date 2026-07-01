@@ -372,7 +372,20 @@ def host_room(room: UUID):
         except FileNotFoundError:
             return "", 0
 
-    return render_template("hostRoom.html", room=room, should_refresh=should_refresh, get_log=get_log)
+    from WebHostLib.discord_auth import current_discord_identity
+    identity = current_discord_identity()
+    my_discord_id = identity.discord_id if identity else None
+
+    # Only build the password lookup if we actually have a linked Discord
+    # identity to match against — avoids leaking passwords to anonymous viewers.
+    my_slot_passwords: Dict[int, str] = {}
+    if my_discord_id:
+        for slot in room.seed.slots:
+            if slot.discord_owner_id == my_discord_id and slot.slot_password:
+                my_slot_passwords[slot.id] = slot.slot_password
+
+    return render_template("hostRoom.html", room=room, should_refresh=should_refresh, get_log=get_log,
+                           my_discord_id=my_discord_id, my_slot_passwords=my_slot_passwords)
 
 
 @app.route('/favicon.ico')

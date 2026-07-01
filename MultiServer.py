@@ -275,6 +275,7 @@ class Context:
         self.player_names: typing.Dict[team_slot, str] = {}
         self.player_name_lookup: typing.Dict[str, team_slot] = {}
         self.connect_names = {}  # names of slots clients can connect to
+        self.slot_passwords: typing.Dict[int, str] = {}  # slot id -> required per-slot connect password (empty/absent = none)
         self.allow_releases = {}
         self.def_allow_collecting_from = {}
         self.allow_collecting_from = {}
@@ -548,6 +549,7 @@ class Context:
         self.seed_name = decoded_obj["seed_name"]
         self.random.seed(self.seed_name)
         self.connect_names = decoded_obj['connect_names']
+        self.slot_passwords = decoded_obj.get('slot_passwords', {})
         self.locations = LocationStore(decoded_obj.pop("locations"))  # pre-emptively free memory
         self.slot_data = decoded_obj['slot_data']
         for slot, data in self.slot_data.items():
@@ -2004,6 +2006,10 @@ async def process_client_cmd(ctx: Context, client: Client, args: dict):
         else:
             team, slot = ctx.connect_names[args['name']]
             game = ctx.games[slot]
+
+            required_slot_password = ctx.slot_passwords.get(slot, "")
+            if required_slot_password and args['password'] != required_slot_password:
+                errors.add('InvalidPassword')
 
             ignore_game = not args.get("game") and any(tag in _non_game_messages for tag in args["tags"])
 

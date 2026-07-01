@@ -10,6 +10,8 @@ from flask_compress import Compress
 from flask_limiter import Limiter
 from pony.flask import Pony
 from werkzeug.routing import BaseConverter
+from dotenv import load_dotenv
+load_dotenv()
 
 from Utils import title_sorted, get_file_safe_name,world_list_sorted
 from .cli import CLI
@@ -79,6 +81,10 @@ app.config["HOST_ADDRESS"] = ""
 app.config["ASSET_RIGHTS"] = False
 app.config["MONITORING_ADMIN_TOKEN"] = None  # Admin token for monitoring API endpoints
 
+# Discord OAuth config (set via environment or your deployment's config loader)
+app.config["DISCORD_CLIENT_ID"] = os.environ.get("DISCORD_CLIENT_ID", "")
+app.config["DISCORD_CLIENT_SECRET"] = os.environ.get("DISCORD_CLIENT_SECRET", "")
+
 cache = Cache()
 Compress(app)
 CLI(app)
@@ -135,3 +141,6 @@ def register() -> None:
 
     from . import api
     app.register_blueprint(api.api_endpoints)
+
+    from .discord_auth import discord_auth
+    app.register_blueprint(discord_auth)

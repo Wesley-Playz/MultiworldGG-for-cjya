@@ -6,7 +6,7 @@
         {{ caller() }}
     </ul>
 {%- endmacro %}
-{% macro list_patches_room(room) %}
+{% macro list_patches_room(room, my_slot_passwords={}) %}
     {% if room.seed.slots %}
         <table id="slots-table">
             <thead>
@@ -14,6 +14,7 @@
                     <th>Id</th>
                     <th>Name</th>
                     <th>Game</th>
+                    <th>Password</th>
                     <th>Download Link</th>
                     <th>Tracker Page</th>
                 </tr>
@@ -25,6 +26,16 @@
                     <td data-tooltip="Connect via Game Client"><a href="mwgg://{{ patch.player_name | e}}:None@{{ config['HOST_ADDRESS'] }}:{{ room.last_port }}?game={{ patch.game }}&room={{ room.id | suuid }}">{{ patch.player_name }}</a></td>
                     <td>{{ patch.game }}</td>
                     <td>
+                        {% if patch.id in my_slot_passwords %}
+                            <span class="interactive" data-tooltip="Only you can see this — it's tied to your Discord login.">
+                                <code>{{ my_slot_passwords[patch.id] }}</code>
+                            </span>
+                        {% elif patch.slot_password %}
+                            <span data-tooltip="This slot is password protected. Log in with the Discord account that uploaded its YAML to see your password.">🔒 Locked</span>
+                        {% else %}
+                            <span data-tooltip="No password required for this slot.">—</span>
+                        {% endif %}
+                    </td>
                         {% if patch.data %}
                             {% if patch.game == "VVVVVV" and room.seed.slots|length == 1 %}
                             <a href="{{ url_for("download_slot_file", room_id=room.id, player_id=patch.player_id) }}" download>

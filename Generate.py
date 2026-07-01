@@ -614,6 +614,13 @@ def roll_settings(weights: dict, plando_options: PlandoOptions = PlandoOptions.b
         game_weights = weights[ret.game]
 
     ret.name = get_choice('name', weights)
+    # Per-slot connect password, if this YAML was produced by a MultiworldGG
+    # lobby (see WebHostLib/api/lobby.py:_generate_slot_password). Plain string
+    # or absent/None for YAMLs that didn't go through a lobby. Not a real game
+    # option, so it's read directly off `weights` rather than through
+    # CommonOptions/PerGameCommonOptions, and is intentionally excluded from
+    # `valid_keys` warnings below by being handled here, before that loop.
+    ret.mwgg_slot_password = weights.get("mwgg_slot_password") or None
     for option_key, option in Options.CommonOptions.type_hints.items():
         setattr(ret, option_key, option.from_any(get_choice(option_key, weights, option.default)))
 

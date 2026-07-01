@@ -22,8 +22,16 @@ from WebHostLib.generate import get_meta
 from WebHostLib.models import (
     Lobby, LobbyPlayer, LobbyMessage, LobbyYaml, LobbyApworld,
     LOBBY_OPEN, LOBBY_GENERATING, LOBBY_DONE, LOBBY_CLOSED, LOBBY_LOCKED,
+    DiscordIdentity,
     UUID,
 )
+
+
+def _current_discord_identity() -> DiscordIdentity | None:
+    sid = session.get("_id")
+    if not sid:
+        return None
+    return DiscordIdentity.get(session_id=sid)
 
 
 def _expire_lobby_if_needed(lobby: Lobby) -> None:
@@ -198,10 +206,14 @@ def lobby_create():
             state=LOBBY_OPEN,
         )
         commit()
+        identity = _current_discord_identity()
         player = LobbyPlayer(
             lobby=lobby,
             session_id=session["_id"],
             player_name=creator_name,
+            discord_id=identity.discord_id if identity else None,
+            discord_username=identity.discord_username if identity else None,
+            discord_avatar=identity.discord_avatar if identity else None,
         )
         LobbyMessage(
             lobby=lobby,
@@ -371,10 +383,14 @@ def lobby_join(lobby: UUID):
         flash('That name is already taken in this lobby.')
         return redirect(url_for('lobby_view', lobby=lobby.id))
 
+    identity = _current_discord_identity()
     player = LobbyPlayer(
         lobby=lobby,
         session_id=session["_id"],
         player_name=player_name,
+        discord_id=identity.discord_id if identity else None,
+        discord_username=identity.discord_username if identity else None,
+        discord_avatar=identity.discord_avatar if identity else None,
     )
     LobbyMessage(
         lobby=lobby,

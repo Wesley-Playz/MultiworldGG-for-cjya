@@ -541,6 +541,10 @@ class MultiData(typing.TypedDict):
     datapackage: dict[str, GamesPackage]
     race_mode: int
     allow_collecting_from: dict[int, bool]
+    # Optional: per-slot connect password (slot id -> password string).
+    # Absent in multidata generated before this feature; MultiServer treats
+    # a missing/empty entry as "no password required" for that slot.
+    slot_passwords: typing.NotRequired[dict[int, str]]
 
 
 if typing.TYPE_CHECKING:  # type-check with pure python implementation until we have a typing stub

@@ -3,13 +3,15 @@ import hashlib
 import json
 import os
 import re
+import secrets
+import string
 import zipfile
 
 import yaml
 from datetime import datetime, timedelta
 from uuid import UUID
 
-from flask import request, session, jsonify, send_file
+from flask import request, session, jsonify, send_file, url_for
 from markupsafe import Markup
 from pony.orm import commit, count, select, flush
 
@@ -25,6 +27,61 @@ from WebHostLib import app, limiter
 
 APWORLD_MAX_SIZE = 60 * 1024 * 1024  # 60 MB — leaves headroom under 64 MB global limit
 LOBBY_LOCAL_GENERATION_YAML_LIMIT = 25
+
+_SLOT_PASSWORD_ALPHABET = string.ascii_uppercase + string.ascii_lowercase + string.digits
+
+
+def _generate_slot_password() -> str:
+    """Random 4-6 character alphanumeric connect password for a single slot."""
+    length = secrets.choice([4, 5, 6])
+    return "".join(secrets.choice(_SLOT_PASSWORD_ALPHABET) for _ in range(length))
+
+
+def _inject_slot_password(content: bytes, password: str) -> bytes:
+    """
+    Add a top-level `mwgg_slot_password` field to a single-document YAML's raw
+    bytes, so the password survives Download Package -> local generation ->
+    Generate.py:roll_settings -> Main.py's write_multidata() unchanged.
+
+    Appends as plain text rather than re-dumping the parsed YAML, to avoid
+    reformatting the player's original file (comments, key order, etc).
+    Falls back to a safe re-dump only if appending would produce invalid YAML
+    (e.g. the file has no trailing newline in a way that breaks concatenation,
+    or the content isn't valid YAML at all — in which case generation will
+    reject it anyway and this is harmless).
+    """
+    try:
+        text = content.decode('utf-8-sig')
+    except UnicodeDecodeError:
+        text = content.decode('utf-8-sig', errors='replace')
+
+    addition = f"\nmwgg_slot_password: \"{password}\"\n"
+    candidate = text + addition
+
+    try:
+        from Utils import parse_yamls
+        docs = list(parse_yamls(candidate.encode('utf-8')))
+        if len(docs) == 1 and docs[0] is not None and docs[0].get("mwgg_slot_password") == password:
+            return candidate.encode('utf-8')
+    except Exception:
+        pass
+
+    # Fallback: re-dump the parsed document with the field set directly.
+    # Loses comments/formatting but guarantees the password is present.
+    try:
+        from Utils import parse_yamls
+        docs = list(parse_yamls(content))
+        if len(docs) == 1 and docs[0] is not None:
+            docs[0]["mwgg_slot_password"] = password
+            return yaml.dump(docs[0], allow_unicode=True, default_flow_style=False).encode('utf-8')
+    except Exception:
+        pass
+
+    # Last resort: return original content unmodified. The slot_password DB
+    # column still has the value; only the auto-carry-through-generation
+    # behavior is lost for this one malformed file.
+    return content
+
 
 def _safe_zip_name(name: str) -> str:
     """Replace characters that are problematic in ZIP entry names."""
@@ -1126,6 +1183,12 @@ def lobby_upload_yaml(lobby: UUID):
     if not player:
         return jsonify({"error": "You are not in this lobby"}), 403
 
+    if not player.discord_id:
+        return jsonify({
+            "error": "You must link your Discord account before uploading a YAML.",
+            "discord_login_url": url_for("discord_auth.login", next=request.referrer),
+        }), 403
+
     current_count = len(player.yamls)
     if current_count >= lobby.max_yamls_per_player:
         return jsonify({"error": f"Maximum {lobby.max_yamls_per_player} YAML(s) per player"}), 400
@@ -1335,6 +1398,9 @@ def lobby_upload_yaml(lobby: UUID):
             diff = f"{apworld_ver} (server: {server_ver})" if server_ver else apworld_ver
             active_apworld_notices.append(f"{game}: custom APWorld {diff}")
 
+        slot_password = _generate_slot_password()
+        content = _inject_slot_password(content, slot_password)
+
         yaml_record = LobbyYaml(
             lobby=lobby,
             player=player,
@@ -1344,6 +1410,7 @@ def lobby_upload_yaml(lobby: UUID):
             is_custom=is_custom,
             requires_game_version=requires_json,
             content=content,
+            slot_password=slot_password,
         )
         commit()
         entry: dict = {"id": yaml_record.id, "filename": filename, "is_custom": is_custom, "game": game}

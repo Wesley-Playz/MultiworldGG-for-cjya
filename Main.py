@@ -3,6 +3,8 @@ from collections.abc import Mapping
 import concurrent.futures
 import logging
 import os
+import secrets
+import string
 import tempfile
 import time
 from typing import Any
@@ -276,6 +278,28 @@ def main(args, seed=None, baked_server_options: dict[str, object] | None = None)
                 for slot in multiworld.player_ids:
                     slot_data[slot] = multiworld.worlds[slot].fill_slot_data()
 
+                # Per-slot connect passwords.
+                # If this YAML came from a MultiworldGG lobby, the password was
+                # already assigned at upload time (before generation even ran)
+                # and is carried here via args.mwgg_slot_password, populated by
+                # Generate.py:roll_settings reading the YAML's top-level
+                # `mwgg_slot_password` key. This keeps the password authoritative
+                # from the moment a Discord-linked user uploads their YAML,
+                # rather than inventing one during generation.
+                # For standalone/CLI generation with no lobby involved, fall
+                # back to generating a fresh random 4-6 char password here so
+                # the feature still works outside the lobby flow.
+                lobby_passwords: dict[int, str] = getattr(args, "mwgg_slot_password", {}) or {}
+                _password_alphabet = string.ascii_uppercase + string.ascii_lowercase + string.digits
+                slot_passwords: dict[int, str] = {}
+                for slot in multiworld.player_ids:
+                    existing = lobby_passwords.get(slot)
+                    if existing:
+                        slot_passwords[slot] = existing
+                    else:
+                        length = secrets.choice([4, 5, 6])
+                        slot_passwords[slot] = "".join(secrets.choice(_password_alphabet) for _ in range(length))
+
                 def precollect_hint(location: Location, auto_status: HintStatus):
                     entrance = er_hint_data.get(location.player, {}).get(location.address, "")
                     hint = NetUtils.Hint(location.item.player, location.player, location.address,
@@ -348,7 +372,8 @@ def main(args, seed=None, baked_server_options: dict[str, object] | None = None)
                     "spheres": spheres,
                     "datapackage": data_package,
                     "race_mode": int(multiworld.is_race),
-                    "allow_collecting_from": allow_collecting_from
+                    "allow_collecting_from": allow_collecting_from,
+                    "slot_passwords": slot_passwords,
                 }
                 # TODO: change to `"version": version_tuple` after getting better serialization
                 AutoWorld.call_all(multiworld, "modify_multidata", multidata)
