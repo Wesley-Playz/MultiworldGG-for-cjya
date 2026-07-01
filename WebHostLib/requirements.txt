@@ -14,3 +14,6 @@ mistune==3.2.1
 docutils==0.22.4
 alt-profanity-check>=1.0.4
 psutil==7.2.2
+
+python-dotenv
+Authlib
