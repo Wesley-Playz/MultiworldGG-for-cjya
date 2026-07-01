@@ -156,7 +156,7 @@ class LobbyYaml(db.Entity):
     # Main.py's write_multidata() unchanged. This DB column exists so the
     # lobby can show/reference the password without re-parsing YAML, and so
     # it stays the single source of truth if a YAML is ever re-downloaded.
-    slot_password = Required(str, default="")
+    slot_password = Optional(str, default="")
 
 
 class LobbyApworld(db.Entity):
