@@ -1460,6 +1460,13 @@ def lobby_download_yaml(lobby: UUID, yaml_id: int):
     if not player:
         return jsonify({"error": "Permission denied"}), 403
 
+    # Only the uploader or the lobby owner may view/download a YAML
+    # (it contains the per-slot password injected at upload time)
+    is_lobby_owner = lobby.owner == session["_id"]
+    is_yaml_owner = yaml_record.player == player
+    if not is_lobby_owner and not is_yaml_owner:
+        return jsonify({"error": "Permission denied"}), 403
+
     content = yaml_record.content
     if isinstance(content, str):
         content = content.encode("utf-8")

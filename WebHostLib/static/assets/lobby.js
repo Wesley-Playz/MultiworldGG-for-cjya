@@ -375,8 +375,11 @@
                     }
                 }
 
-                yamlMenuItems.push(`<a class="yaml-menu-item" href="${downloadHref}" download>Download YAML</a>`);
-                yamlMenuItems.push(`<button class="yaml-menu-item yaml-view-btn" data-yaml-id="${y.id}" data-filename="${escapeHtml(y.filename)}">View YAML</button>`);
+                const canViewYaml = IS_OWNER || p.id === MY_PLAYER_ID;
+                if (canViewYaml) {
+                    yamlMenuItems.push(`<a class="yaml-menu-item" href="${downloadHref}" download>Download YAML</a>`);
+                    yamlMenuItems.push(`<button class="yaml-menu-item yaml-view-btn" data-yaml-id="${y.id}" data-filename="${escapeHtml(y.filename)}">View YAML</button>`);
+                }
                 if ((currentState === LOBBY_STATE_OPEN || currentState === LOBBY_STATE_LOCKED) && (IS_OWNER || p.id === MY_PLAYER_ID)) {
                     yamlMenuItems.push(`<button class="yaml-menu-item yaml-delete-btn" data-yaml-id="${y.id}">Remove YAML</button>`);
                 }
