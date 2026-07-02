@@ -96,7 +96,7 @@ def process_multidata(compressed_multidata, files={}):
     return slots, compressed_multidata
 
 
-def upload_zip_to_db(zfile: zipfile.ZipFile, owner=None, meta={"race": False}, sid=None):
+def upload_zip_to_db(zfile: zipfile.ZipFile, owner=None, meta={"race": False}, sid=None, owning_lobby=None):
     if not owner:
         owner = session["_id"]
     infolist = zfile.infolist()
@@ -165,27 +165,27 @@ def upload_zip_to_db(zfile: zipfile.ZipFile, owner=None, meta={"race": False}, s
         for slot in slots:
             slot.seed = seed
 
-        # If this generation came from a Lobby (sid == lobby.generation_id),
-        # match each Slot back to the LobbyYaml that produced it (by player
-        # name, which Main.py's handle_name() makes unique within a gen) and
-        # stamp the Discord identity of whoever uploaded that YAML. The room
-        # page later uses discord_owner_id (a stable identity), not the
-        # password itself, to decide who to reveal a slot's password to —
-        # passwords alone aren't guaranteed unique across a large lobby.
-        if sid:
-            owning_lobby = Lobby.get(generation_id=sid)
-            if owning_lobby is not None:
-                from .models import LobbyYaml
-                name_to_discord_id = {}
-                for yaml_record in select(y for y in LobbyYaml if y.lobby == owning_lobby):
-                    resolved_name = yaml_record.yaml_player_name or yaml_record.player.player_name
-                    if yaml_record.player.discord_id:
-                        name_to_discord_id[resolved_name] = yaml_record.player.discord_id
-                for slot in slots:
-                    discord_id = name_to_discord_id.get(slot.player_name)
-                    if discord_id:
-                        slot.discord_owner_id = discord_id
-                flush()
+        # If this generation came from a Lobby, match each Slot back to the
+        # LobbyYaml that produced it (by player name) and stamp the Discord
+        # identity of whoever uploaded that YAML. The room page uses
+        # discord_owner_id (a stable identity) to decide who to reveal a
+        # slot's password to — passwords alone aren't guaranteed unique across
+        # a large lobby.
+        resolved_lobby = owning_lobby
+        if resolved_lobby is None and sid:
+            resolved_lobby = Lobby.get(generation_id=sid)
+        if resolved_lobby is not None:
+            from .models import LobbyYaml
+            name_to_discord_id = {}
+            for yaml_record in select(y for y in LobbyYaml if y.lobby == resolved_lobby):
+                resolved_name = yaml_record.yaml_player_name or yaml_record.player.player_name
+                if yaml_record.player.discord_id:
+                    name_to_discord_id[resolved_name] = yaml_record.player.discord_id
+            for slot in slots:
+                discord_id = name_to_discord_id.get(slot.player_name)
+                if discord_id:
+                    slot.discord_owner_id = discord_id
+            flush()
 
         return seed
     else:

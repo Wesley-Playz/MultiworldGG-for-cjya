@@ -2534,13 +2534,26 @@ def lobby_upload_game(lobby: UUID):
         file_bytes = f.read()
         if zipfile.is_zipfile(io.BytesIO(file_bytes)):
             with zipfile.ZipFile(io.BytesIO(file_bytes), 'r') as zf:
-                seed = upload_zip_to_db(zf, owner=lobby.owner, meta=meta)
+                seed = upload_zip_to_db(zf, owner=lobby.owner, meta=meta, owning_lobby=lobby)
         else:
+            from WebHostLib.upload import process_multidata
+            from WebHostLib.models import LobbyYaml
             slots, multidata = process_multidata(file_bytes)
             seed = Seed(multidata=multidata, slots=slots, owner=lobby.owner, meta=json.dumps(meta))
             flush()
             for slot in slots:
                 slot.seed = seed
+            # Stamp discord_owner_id for raw .archipelago uploads too
+            name_to_discord_id = {}
+            for yaml_record in select(y for y in LobbyYaml if y.lobby == lobby):
+                resolved_name = yaml_record.yaml_player_name or yaml_record.player.player_name
+                if yaml_record.player.discord_id:
+                    name_to_discord_id[resolved_name] = yaml_record.player.discord_id
+            for slot in slots:
+                discord_id = name_to_discord_id.get(slot.player_name)
+                if discord_id:
+                    slot.discord_owner_id = discord_id
+            flush()
     except Exception as e:
         return jsonify({"error": f"Failed to process game file: {e}"}), 400
 
