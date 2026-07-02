@@ -25,7 +25,7 @@ from WebHostLib.models import (
 )
 from WebHostLib import app, limiter
 
-APWORLD_MAX_SIZE = 60 * 1024 * 1024  # 60 MB — leaves headroom under 64 MB global limit
+APWORLD_MAX_SIZE = 95 * 1024 * 1024  # 95 MB — leaves headroom under 100 MB global limit
 LOBBY_LOCAL_GENERATION_YAML_LIMIT = 25
 
 _SLOT_PASSWORD_ALPHABET = string.ascii_uppercase + string.ascii_lowercase + string.digits
@@ -1186,7 +1186,9 @@ def lobby_upload_yaml(lobby: UUID):
     if not player.discord_id:
         return jsonify({
             "error": "You must link your Discord account before uploading a YAML.",
-            "discord_login_url": url_for("discord_auth.login", next=request.referrer),
+            "discord_login_url": url_for("discord_auth.login", next=url_for(
+                "lobby_view", lobby=lobby.id, _external=False
+            )),
         }), 403
 
     current_count = len(player.yamls)
@@ -1345,10 +1347,9 @@ def lobby_upload_yaml(lobby: UUID):
         seen_names[name] = filename
 
     # Check against existing YAMLs in the lobby
-    existing_names = set(select(
-        y.yaml_player_name for y in LobbyYaml
-        if y.lobby == lobby and y.yaml_player_name is not None
-    )[:])
+    existing_names = {y.yaml_player_name for y in LobbyYaml.select(
+        lambda y: y.lobby == lobby and y.yaml_player_name is not None
+    )}
     for filename, name in new_names.items():
         if _has_name_template(name):
             continue

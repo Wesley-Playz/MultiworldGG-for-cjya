@@ -1017,14 +1017,14 @@
 
     async function uploadApworld(yamlId, file) {
         if (file.size > APWORLD_MAX_BYTES) {
-            showToast(`APWorld file is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). The maximum allowed size is 60 MB.`);
+            showToast(`APWorld file is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). The maximum allowed size is 95 MB.`);
             return;
         }
 
         try {
             const previewResult = await postApworld(yamlId, file, "preview");
             if (previewResult.status === 413) {
-                showToast("APWorld file is too large. The maximum allowed size is 60 MB.");
+                showToast("APWorld file is too large. The maximum allowed size is 95 MB.");
                 return;
             }
             if (previewResult.data.error) {

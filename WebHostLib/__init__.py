@@ -34,7 +34,7 @@ app.config["DEBUG"] = False
 app.config["PORT"] = 80
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["LOBBY_APWORLD_PATH"] = os.path.abspath(LOBBY_APWORLD_FOLDER)
-app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024  # 64 megabyte limit
+app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 megabyte limit
 # if you want to deploy, make sure you have a non-guessable secret key
 app.config["SECRET_KEY"] = bytes(socket.gethostname(), encoding="utf-8")
 app.config["SESSION_PERMANENT"] = True

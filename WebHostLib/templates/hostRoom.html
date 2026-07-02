@@ -23,7 +23,7 @@
     <div id="host-room">
       <div id="discord-identity-banner" style="margin-bottom: 0.75em;">
         {% if my_discord_id %}
-            Logged in with Discord. Slots tied to your account show their password above.
+            Logged in with Discord. Slots tied to your account show their password below.
             <form method="post" action="{{ url_for('discord_auth.logout') }}" style="display:inline;">
                 <button type="submit" class="link-button">Unlink Discord</button>
             </form>

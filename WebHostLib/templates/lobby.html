@@ -12,6 +12,13 @@
     {% include 'header/grassHeader.html' %}
     <div id="lobby-wrapper">
         <div id="lobby-container" class="grass-island">
+            {% if player and not player.discord_id %}
+            <div style="margin-bottom: 0.75em; padding: 0.6em 0.9em; background: rgba(240,80,50,0.15); border-radius: 6px; border: 1px solid rgba(240,80,50,0.5); font-weight: bold;">
+                ⚠️ You have joined this lobby but have not linked your Discord account.
+                You will not be able to upload YAMLs until you
+                <a href="{{ url_for('discord_auth.login', next=request.path) }}" style="color: #e87040; text-decoration: underline;">log in with Discord</a>.
+            </div>
+            {% endif %}
             <h2 id="lobby-title">{{ lobby.title }}</h1>
 
             {% if lobby.state == -1 %}
